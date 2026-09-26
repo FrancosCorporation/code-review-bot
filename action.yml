@@ -1,0 +1,33 @@
+name: 'AI Code Review'
+description: 'Reviews pull requests with AI: diff → pluggable LLM adapter → actionable comments'
+author: 'FrancosCorporation'
+inputs:
+  github_token:
+    description: 'GitHub token'
+    required: true
+  llm_base_url:
+    description: 'OpenAI-compatible base URL'
+    required: false
+    default: ''
+  llm_api_key:
+    description: 'LLM API key (use GitHub secrets!)'
+    required: false
+    default: ''
+  llm_model:
+    description: 'Model name'
+    required: false
+    default: 'llama-3.1-70b-instruct'
+  idioma:
+    description: 'Review language (pt/en)'
+    required: false
+    default: 'pt'
+  severidade:
+    description: 'Minimum severity to comment (info/warn/critico)'
+    required: false
+    default: 'warn'
+runs:
+  using: 'node20'
+  main: 'src/cr.js'
+branding:
+  icon: 'eye'
+  color: 'purple'

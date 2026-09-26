@@ -1,0 +1,11 @@
+{
+  "name": "code-review-bot",
+  "version": "0.1.0",
+  "description": "Bot de code review com IA para GitHub Actions - diff -> chunks -> LLM adapter -> comentarios acionaveis",
+  "main": "src/cr.js",
+  "type": "module",
+  "license": "MIT",
+  "author": "Rodolfo Franco (FrancosCorporation)",
+  "scripts": { "test": "KANBANEX_NO_LISTEN=1 node --test test/cr-test.mjs" },
+  "engines": { "node": ">=18" }
+}
