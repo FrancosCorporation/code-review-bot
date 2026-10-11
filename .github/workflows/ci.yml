@@ -1,18 +1,35 @@
 name: CI
+
 on:
   push:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  test-and-static-security:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - run: npm install
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
       - run: npm test
+      - name: Guard review boundaries
+        run: |
+          if grep -REn '\beval[[:space:]]*\(|new[[:space:]]+Function[[:space:]]*\(' src; then
+            echo 'Dynamic code evaluation is forbidden.'
+            exit 1
+          fi
+          grep -Fq "role: 'system'" src/adapter.js || { echo 'System prompt boundary is missing.'; exit 1; }
+          grep -Fq 'JSON.stringify({ arquivo, diff })' src/adapter.js || { echo 'Diff data encoding is missing.'; exit 1; }
+          grep -Fq 'AbortSignal.timeout' src/adapter.js || { echo 'LLM timeout is missing.'; exit 1; }
+          grep -Fq 'AbortSignal.timeout' src/cr.js || { echo 'GitHub timeout is missing.'; exit 1; }
+          grep -Fq 'escaparMarkdown' src/comentario.js || { echo 'Comment escaping is missing.'; exit 1; }
       - name: Scan de licenças das dependências
         run: npx license-checker --production --failOn "AGPL;GPL;LGPL;CC-BY-NC" || (echo "LICENÇA INCOMPATÍVEL" && exit 1)
