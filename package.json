@@ -6,6 +6,9 @@
   "type": "module",
   "license": "MIT",
   "author": "Rodolfo Franco (FrancosCorporation)",
-  "scripts": { "test": "KANBANEX_NO_LISTEN=1 node --test test/cr-test.mjs" },
-  "engines": { "node": ">=18" }
+  "scripts": {
+    "check": "node --check src/adapter.js && node --check src/chunks.js && node --check src/comentario.js && node --check src/cr.js",
+    "test": "CODE_REVIEW_BOT_NO_ACTION=1 node --test test/cr-test.mjs"
+  },
+  "engines": { "node": ">=20" }
 }

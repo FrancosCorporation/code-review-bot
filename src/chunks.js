@@ -1,4 +1,4 @@
-// Diff chunker: separa o diff em hunks (por arquivo), com limite por arquivo e total.
+// Diff chunker: separa por arquivo/hunk e limita linhas e bytes por bloco.
 export function separarArquivos(diff) {
   const arquivos = [];
   let atual = null;
@@ -13,29 +13,87 @@ export function separarArquivos(diff) {
       atual.hunks[atual.hunks.length - 1].linhas.push(linha);
     }
   }
-  return arquivos.filter((a) => a.hunks.length > 0);
+  return arquivos.filter((arquivo) => arquivo.hunks.length > 0);
 }
 
-// agrupa hunks em blocos de no máximo maxLinhas (para respeitar o contexto do LLM)
-export function agruparEmBlocos(arquivos, maxLinhas = 150) {
+function limitarLinha(linha, maxBytes) {
+  const texto = String(linha);
+  if (Buffer.byteLength(texto, 'utf8') <= maxBytes) return { texto, truncado: false };
+  const marcador = ' …[linha truncada]';
+  const disponivel = Math.max(0, maxBytes - Buffer.byteLength(marcador, 'utf8'));
+  let prefixo = '';
+  let usados = 0;
+  for (const caractere of texto) {
+    const tamanho = Buffer.byteLength(caractere, 'utf8');
+    if (usados + tamanho > disponivel) break;
+    prefixo += caractere;
+    usados += tamanho;
+  }
+  return { texto: prefixo + marcador, truncado: true };
+}
+
+// Cada bloco respeita ambos os tetos. Hunk headers são repetidos ao dividir uma hunk longa.
+export function agruparEmBlocos(arquivos, maxLinhas = 150, maxBytes = 8192) {
+  const tetoLinhas = Math.max(2, Math.floor(maxLinhas));
+  const tetoBytes = Math.max(256, Math.floor(maxBytes));
   const blocos = [];
-  for (const a of arquivos) {
+
+  for (const arquivo of arquivos) {
     let blocoAtual = null;
-    for (const hunk of a.hunks) {
-      const tamanho = hunk.linhas.length + 1;
-      if (!blocoAtual || blocoAtual.linhas + tamanho > maxLinhas) {
-        blocoAtual = { arquivo: a.arquivo, conteudo: [], linhas: 0 };
-        blocos.push(blocoAtual);
+    let hunkAtual = null;
+    for (const hunk of arquivo.hunks) {
+      const cabecalho = limitarLinha(hunk.cabecalho, Math.min(tetoBytes - 64, 1024));
+      const linhas = hunk.linhas.length ? hunk.linhas : [''];
+      const bytesCabecalho = Buffer.byteLength(cabecalho.texto, 'utf8');
+      const maxBytesLinha = Math.max(1, tetoBytes - bytesCabecalho - 1);
+
+      for (const linha of linhas) {
+        const trecho = limitarLinha(linha, maxBytesLinha);
+        let precisaCabecalho = blocoAtual === null || hunkAtual !== hunk;
+        let bytesNovos = Buffer.byteLength(trecho.texto, 'utf8') + 1 + (precisaCabecalho ? bytesCabecalho + 1 : 0);
+        let linhasNovas = 1 + (precisaCabecalho ? 1 : 0);
+        if (!blocoAtual || blocoAtual.linhas + linhasNovas > tetoLinhas || blocoAtual.bytes + bytesNovos > tetoBytes) {
+          blocoAtual = { arquivo: arquivo.arquivo, conteudo: [], linhas: 0, bytes: 0, truncado: false };
+          blocos.push(blocoAtual);
+          hunkAtual = null;
+          precisaCabecalho = true;
+          bytesNovos = Buffer.byteLength(trecho.texto, 'utf8') + bytesCabecalho + 2;
+          linhasNovas = 2;
+        }
+        if (hunkAtual !== hunk) {
+          blocoAtual.conteudo.push(cabecalho.texto);
+          blocoAtual.linhas += 1;
+          blocoAtual.bytes += bytesCabecalho + (blocoAtual.bytes ? 1 : 0);
+          blocoAtual.truncado ||= cabecalho.truncado;
+          hunkAtual = hunk;
+        }
+        blocoAtual.conteudo.push(trecho.texto);
+        blocoAtual.linhas += 1;
+        blocoAtual.bytes += Buffer.byteLength(trecho.texto, 'utf8') + 1;
+        blocoAtual.truncado ||= trecho.truncado;
       }
-      blocoAtual.conteudo.push(hunk.cabecalho, ...hunk.linhas);
-      blocoAtual.linhas += tamanho;
     }
   }
-  return blocos.map((b, i) => ({ id: i + 1, arquivo: b.arquivo, linhas: b.linhas, diff: b.conteudo.join('\n') }));
+
+  return blocos.map((bloco, indice) => ({
+    id: indice + 1,
+    arquivo: bloco.arquivo,
+    linhas: bloco.linhas,
+    bytes: Math.max(0, bloco.bytes - 1),
+    truncado: bloco.truncado,
+    diff: bloco.conteudo.join('\n')
+  }));
 }
 
-// filtro por extensão/arquivo ignorado (config do .github/cr.yml)
+function padraoIgnora(caminho, padrao) {
+  if (!padrao.includes('*')) return caminho.includes(padrao);
+  const regex = new RegExp(`^${padrao.split('*').map((parte) => parte.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*')}$`);
+  return regex.test(caminho);
+}
+
+// Patterns with * use glob matching; other entries are substring filters.
 export function filtrar(blocos, { ignorados = [], maxBlocos = 20 } = {}) {
-  const ok = blocos.filter((b) => !ignorados.some((padrao) => b.arquivo.includes(padrao)));
-  return ok.slice(0, maxBlocos);
+  const limite = Number.isFinite(Number(maxBlocos)) ? Math.max(1, Math.floor(Number(maxBlocos))) : 20;
+  const validos = blocos.filter((bloco) => !ignorados.some((padrao) => padraoIgnora(bloco.arquivo, String(padrao))));
+  return validos.slice(0, limite);
 }

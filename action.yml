@@ -3,7 +3,7 @@ description: 'Reviews pull requests with AI: diff → pluggable LLM adapter → 
 author: 'FrancosCorporation'
 inputs:
   github_token:
-    description: 'GitHub token'
+    description: 'GITHUB_TOKEN do job chamador (nunca use um PAT pessoal)'
     required: true
   llm_base_url:
     description: 'OpenAI-compatible base URL'
@@ -25,8 +25,20 @@ inputs:
     description: 'Minimum severity to comment (info/warn/critico)'
     required: false
     default: 'warn'
+  ignorados:
+    description: 'Comma-separated path substrings or * globs to skip'
+    required: false
+    default: ''
+  max_blocos:
+    description: 'Maximum number of diff chunks sent to the LLM (1-50)'
+    required: false
+    default: '20'
+  max_diff_bytes:
+    description: 'Maximum diff bytes to read (1024-1048576)'
+    required: false
+    default: '102400'
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'src/cr.js'
 branding:
   icon: 'eye'

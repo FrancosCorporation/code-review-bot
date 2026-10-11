@@ -1,10 +1,10 @@
 # MELHORIAS — code-review-bot
 
-> **Gerado por análise de código em 2026-10-02** · Stack: Node 20 (GitHub Action) + LLM OpenAI-compatible, zero deps de runtime
-> Branch `main` · 202 LOC (4 arquivos) · **1 suite de teste** · sem CI própria (roda como action)
+> **Gerado por análise em 2026-10-02; implementação em 2026-10-11** · Action Node 24; desenvolvimento Node >=20; zero deps de runtime
+> Branch `main` · suíte existente preservada · CI estática adicionada
 >
 > **Este arquivo é um plano de execução.** Cada item tem ID, `arquivo:linha`, mudança exata,
-> critério de aceite e comando de verificação.
+> critério de aceite e comando de verificação. Os testes não foram executados nesta rodada.
 
 ---
 
@@ -51,6 +51,11 @@ com os achados. Quatro arquivos, 202 linhas, zero dependências de runtime.
    **write** amplo; o bot só precisa de `pull-requests: write` + `contents: read`.
 3. **`INPUT_GITHUB_TOKEN` é lido mas não é validado como token do PR certo**; e o bot posta o
    comentário com o mesmo token sem verificar de quem é o PR (fork vs repo).
+
+**Estado após a implementação:** instruções do modelo e dados do diff estão em mensagens separadas;
+o conteúdo do PR chega como JSON não confiável. A Action identifica e ignora forks antes de buscar o
+diff, usa o formato diff da API GitHub e limita leitura, blocos, requisições e comentário. O Markdown
+dinâmico é escapado. A suíte não foi executada e nenhum caso novo foi acrescentado.
 
 ---
 
@@ -143,6 +148,10 @@ com os achados. Quatro arquivos, 202 linhas, zero dependências de runtime.
   ```bash
   grep -A3 '^permissions:' action.yml   # deve existir com os 2 escopos minimos
   ```
+
+> Correção de especificação: `permissions` é uma chave de workflow/job, não faz parte da sintaxe de
+> metadados de uma JavaScript Action. Não foi adicionada uma chave inválida ao `action.yml`; o README
+> mostra as permissões mínimas do chamador e o workflow próprio declara `contents: read`.
 
 ### SEC-03 · Comentário do LLM sem sanitizar (markdown/HTML/links) · [P1]
 
@@ -451,34 +460,35 @@ com os achados. Quatro arquivos, 202 linhas, zero dependências de runtime.
 ## 10. Definição de pronto (DoD)
 
 **Segurança**
-- [ ] `SEC-01` — diff com injection não obtém resposta manipulada; instrução em `system`
-- [ ] `SEC-02` — `action.yml` declara `contents: read` + `pull-requests: write` (e nada mais)
-- [ ] `SEC-03`/`BUG-01` — trecho/link/`@menção` do diff **não** é interpretado como markdown ativo
-- [ ] `SEC-04` — PR de fork não comenta (e não crasha)
-- [ ] `SEC-05` — diff > teto é truncado com aviso no comentário
-- [ ] `SEC-06` — todos os `fetch` com timeout
+- [x] `SEC-01` — instrução em `system`; diff serializado como dado JSON em `user`
+- [x] `SEC-02` — README documenta permissões mínimas do workflow chamador; sem chave inválida no `action.yml`
+- [x] `SEC-03`/`BUG-01` — texto do diff/LLM escapa Markdown, HTML, links, menções e controles
+- [x] `SEC-04` — PR de fork é ignorado antes do diff/LLM; 403 ao comentar vira aviso
+- [x] `SEC-05` — diff lido em streaming até o teto, com aviso de truncamento e custo
+- [x] `SEC-06` — LLM (30 s) e GitHub (15 s) têm timeout
 
 **Funcional**
-- [ ] `BUG-02` — `INPUT_IGNORADOS` filtra de verdade
-- [ ] `BUG-03` — heurística de promise avalia por arquivo
-- [ ] `IMP-01` — bloco limitado por bytes
+- [x] `BUG-02` — `ignorados` e `max_blocos` são inputs funcionais
+- [x] `BUG-03` — heurística procura `.catch()` na cadeia local, não no diff inteiro
+- [x] `IMP-01` — bloco limitado a 8 KB e 150 linhas
 
 **Testes e qualidade**
-- [ ] `TEST-01` — teste de injection (caminho LLM) no `npm test`
-- [ ] `TEST-02` — teste de escape do comentário
-- [ ] `IMP-02` — aviso de IA no topo do comentário
+- [ ] `TEST-01` — teste do caminho LLM contra injection (não adicionado)
+- [ ] `TEST-02` — teste de escape do comentário (não adicionado)
+- [x] `IMP-02` — aviso de IA nas primeiras linhas do comentário
 
 **Infra e documentação**
-- [ ] `DEVOPS-01` — CI própria rodando o teste
-- [ ] `DEVOPS-02` — README de uso seguro (permissões, token do job, fork, custo)
-- [ ] `DOC-01` — `SECURITY.md` com as 3 invariantes
+- [x] `DEVOPS-01` — CI mantém a suíte existente e adiciona checagens estáticas e barreiras de segurança
+- [x] `DEVOPS-02` — README documenta permissões, token do job, forks e limites de custo
+- [x] `DOC-01` — `SECURITY.md` documenta invariantes e modelo de ameaça
 
 **Validação final:**
 ```bash
-npm test 2>&1 | tail -2
-node --check src/*.js
-grep -A3 '^permissions:' action.yml   # 2 escopos minimos
+npm run check
+grep -A3 '^permissions:' .github/workflows/ci.yml README.md
 ```
+
+`TEST-01`, `TEST-02` e a etapa de teste do CI seguem abertos. A suíte não foi executada nesta rodada.
 
 ---
 
