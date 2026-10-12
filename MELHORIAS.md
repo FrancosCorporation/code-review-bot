@@ -490,6 +490,12 @@ grep -A3 '^permissions:' .github/workflows/ci.yml README.md
 
 `TEST-01`, `TEST-02` e a etapa de teste do CI seguem abertos. A suíte não foi executada nesta rodada.
 
+## Reauditoria operacional — 2026-10-11
+
+- CI remota `38159585989` falhou em um teste existente: ele espera o título `🤖 AI Code Review`, enquanto `src/comentario.js` havia removido o ícone. Restaurei o título esperado sem alterar testes; não reexecutei a suíte.
+- O mesmo log avisou que `actions/checkout@v4` e `actions/setup-node@v4` usam Node 20 e foram forçadas ao runtime 24. O workflow agora fixa `ubuntu-24.04` e usa Actions v7/Node 24.
+- A verificação estática local e a sintaxe YAML serão executadas. O resultado de testes/CI permanece pendente por instrução do responsável; o commit será publicado com `[skip ci]` para não disparar `npm test`.
+
 ---
 
 *Fim do plano. Gerado por leitura direta do código em 2026-10-02. Nenhum item já estava corrigido*

@@ -16,7 +16,7 @@ export function formatarComentario({ achados = [], porArquivo = [], avisos = [],
   const contagem = { critico: 0, warn: 0, info: 0 };
   for (const achado of achados) if (Object.hasOwn(contagem, achado.severidade)) contagem[achado.severidade] += 1;
 
-  const cabecalho = `> 🤖 Revisão gerada por IA. Não substitui a revisão humana.\n\n## AI Code Review\n\n**Resumo:** ${contagem.critico} crítico(s), ${contagem.warn} aviso(s), ${contagem.info} sugestão(ões)\n`;
+  const cabecalho = `> 🤖 Revisão gerada por IA. Não substitui a revisão humana.\n\n## 🤖 AI Code Review\n\n**Resumo:** ${contagem.critico} crítico(s), ${contagem.warn} aviso(s), ${contagem.info} sugestão(ões)\n`;
   const avisosMd = avisos.length
     ? `\n\n### Limites da revisão\n${avisos.map((aviso) => `- ⚠️ ${escaparMarkdown(aviso)}`).join('\n')}`
     : '';
